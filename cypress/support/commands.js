@@ -12,6 +12,7 @@
 Cypress.Commands.add('loginAsTestUser', () => {
   cy.log('🔐 Logging in as test user via API for CI optimization');
   
+  // Primer intento de login
   cy.request({
     method: 'POST',
     url: '/api/login',
@@ -23,11 +24,37 @@ Cypress.Commands.add('loginAsTestUser', () => {
   }).then((response) => {
     if (response.status === 200) {
       cy.log('✅ API login successful');
+      // Verificar que el login estableció la sesión correctamente
       cy.visit('/dishes');
-      cy.url().should('include', '/dishes');
+      cy.url().should('include', '/dishes', { timeout: 10000 });
     } else {
-      cy.log('⚠️ API login failed, falling back to UI login');
-      cy.loginAsTestUserUI();
+      cy.log(`⚠️ API login failed with status: ${response.status}`);
+      cy.log(`Response body: ${JSON.stringify(response.body)}`);
+      
+      // Intentar crear el usuario nuevamente y luego hacer login
+      cy.log('🔄 Attempting to re-setup user and login again...');
+      cy.setupTestUser();
+      cy.wait(2000); // Esperar un poco más para que se procese
+      
+      // Segundo intento de login después de setup
+      cy.request({
+        method: 'POST',
+        url: '/api/login',
+        body: {
+          email: 'test@nutriapp.com',
+          password: 'nutriapp123'
+        },
+        failOnStatusCode: false
+      }).then((retryResponse) => {
+        if (retryResponse.status === 200) {
+          cy.log('✅ API login successful on retry');
+          cy.visit('/dishes');
+          cy.url().should('include', '/dishes', { timeout: 10000 });
+        } else {
+          cy.log('⚠️ API login failed on retry, falling back to UI login');
+          cy.loginAsTestUserUI();
+        }
+      });
     }
   });
 });
@@ -37,35 +64,77 @@ Cypress.Commands.add('loginAsTestUserUI', () => {
   cy.log('🔐 Logging in via UI');
   
   cy.visit('/login');
-  cy.get('[data-testid="login-email-input"]', { timeout: 10000 }).should('be.visible').type('test@nutriapp.com');
-  cy.get('[data-testid="login-password-input"]').type('nutriapp123');
-  cy.get('[data-testid="login-submit"]').click();
   
-  // Espera robusta para CI
-  cy.url({ timeout: 15000 }).should('include', '/dishes');
-  cy.get('[data-testid="dishes-container"]', { timeout: 10000 }).should('be.visible');
+  // Esperar que la página esté completamente cargada
+  cy.get('[data-testid="login-email-input"]', { timeout: 15000 }).should('be.visible').clear().type('test@nutriapp.com');
+  cy.get('[data-testid="login-password-input"]', { timeout: 10000 }).should('be.visible').clear().type('nutriapp123');
+  
+  // Verificar que el botón esté habilitado antes de hacer click
+  cy.get('[data-testid="login-submit"]').should('be.enabled').click();
+  
+  // Espera robusta para CI con mejor timeout
+  cy.url({ timeout: 20000 }).should('include', '/dishes');
+  cy.get('[data-testid="dishes-container"]', { timeout: 15000 }).should('be.visible');
+  
+  cy.log('✅ UI login successful');
 });
 
 // Setup de usuario de prueba para CI
 Cypress.Commands.add('setupTestUser', () => {
   cy.log('🔧 Setting up test user for CI environment');
   
-  // Intenta registrar usuario de prueba (puede fallar si ya existe)
+  // Primero intentar hacer login para ver si ya existe
   cy.request({
     method: 'POST',
-    url: '/api/register',
+    url: '/api/login',
     body: {
-      name: 'Test User',
       email: 'test@nutriapp.com',
       password: 'nutriapp123'
     },
     failOnStatusCode: false
-  }).then((response) => {
-    if (response.status === 200 || response.status === 201) {
-      cy.log('✅ Test user registered successfully');
-    } else {
-      cy.log('ℹ️ Test user already exists, continuing...');
+  }).then((loginResponse) => {
+    if (loginResponse.status === 200) {
+      cy.log('✅ Test user already exists and can login');
+      return; // Usuario ya existe y funciona
     }
+    
+    cy.log('⚠️ Test user does not exist, creating...');
+    // Si login falla, intenta registrar usuario de prueba
+    cy.request({
+      method: 'POST',
+      url: '/api/register',
+      body: {
+        name: 'Test User',
+        email: 'test@nutriapp.com',
+        password: 'nutriapp123'
+      },
+      failOnStatusCode: false
+    }).then((registerResponse) => {
+      if (registerResponse.status === 200 || registerResponse.status === 201) {
+        cy.log('✅ Test user registered successfully');
+        
+        // Verificar que el registro funcionó haciendo login inmediatamente
+        cy.wait(1000); // Pequeña pausa para que DB procese
+        cy.request({
+          method: 'POST',
+          url: '/api/login',
+          body: {
+            email: 'test@nutriapp.com',
+            password: 'nutriapp123'
+          },
+          failOnStatusCode: false
+        }).then((verifyResponse) => {
+          if (verifyResponse.status === 200) {
+            cy.log('✅ Test user verified - login successful after registration');
+          } else {
+            cy.log('❌ Test user registration failed - cannot login after register');
+          }
+        });
+      } else {
+        cy.log('❌ Test user registration failed');
+        cy.log(`Registration response: ${JSON.stringify(registerResponse.body)}`);
+      }
+    });
   });
 });
 
