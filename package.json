@@ -14,19 +14,24 @@
     "test": "cypress run",
     "test:ci": "cypress run --config-file cypress.config.ci.js --browser electron --headless",
     "test:ci:record": "cypress run --config-file cypress.config.ci.js --browser electron --headless --record",
+    "test:github": "cypress run --config-file cypress.config.github.js --browser electron --headless",
+    "test:github:record": "cypress run --config-file cypress.config.github.js --browser electron --headless --record",
     "test:headed": "cypress run --headed --no-exit",
     "test:chrome": "cypress run --browser chrome",
     "test:firefox": "cypress run --browser firefox",
     "test:edge": "cypress run --browser edge",
     "cy:verify": "cypress verify",
     "cy:info": "cypress info",
-    "cy:version": "cypress version"
+    "cy:version": "cypress version",
+    "debug:env": "node -e 'console.log(process.env)' | grep -i cypress || echo 'No Cypress env vars'",
+    "debug:node": "node --version && npm --version",
+    "debug:cache": "ls -la ~/.cache/Cypress/ || echo 'No Cypress cache found'"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "cypress": "^15.6.0"
+    "cypress": "^13.15.0"
   }
 }

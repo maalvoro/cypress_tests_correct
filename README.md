@@ -230,6 +230,52 @@ npm run cy:verify            # Verificar instalación de Cypress
 - **Artifact collection** automático
 - **Notifications** de estado de CI
 
+## ⚙️ Compatibilidad y Configuración Node.js
+
+### Versiones Soportadas
+- **Node.js**: 20.x (recomendado para CI)
+- **Cypress**: 13.15.0 (optimizado para compatibilidad)
+- **npm**: 9.x o superior
+
+### Configuraciones Específicas para CI
+
+#### cypress.config.github.js
+Configuración especial para GitHub Actions que evita problemas de compatibilidad:
+- Desactiva características experimentales que pueden causar conflictos
+- Optimiza timeouts para entornos CI
+- Configura retry automático para mayor estabilidad
+- Usa solo CommonJS para evitar problemas con tsx loader
+
+#### Variables de Entorno Críticas
+```bash
+# Para evitar problemas de memoria en CI
+NODE_OPTIONS="--max-old-space-size=4096"
+
+# Desactivar características experimentales problemáticas
+CYPRESS_EXPERIMENTAL_SOURCE_REWRITING=false
+CYPRESS_EXPERIMENTAL_STUDIO=false
+
+# Timeouts optimizados para CI
+CYPRESS_defaultCommandTimeout=15000
+CYPRESS_requestTimeout=20000
+```
+
+### Resolución de Problemas Comunes
+
+#### Error: "tsx must be loaded with --import instead of --loader"
+**Causa**: Incompatibilidad entre Node.js 18+ y Cypress con tsx loader
+**Solución**: 
+- Usar Node.js 20 en CI
+- Usar configuración `cypress.config.github.js`
+- Evitar `--loader` flags en `NODE_OPTIONS`
+
+#### CI colgándose por 17+ minutos
+**Causa**: Conflictos de tsx loader en Node.js 18.20.8
+**Solución**:
+- Actualizar a Node.js 20 en GitHub Actions
+- Downgrade Cypress a versión 13.15.0
+- Usar `--legacy-peer-deps` en instalación npm
+
 ## 📚 Documentación Adicional
 
 - **[CI_SETUP_GUIDE.md](./CI_SETUP_GUIDE.md)** - Guía completa de configuración CI/CD
