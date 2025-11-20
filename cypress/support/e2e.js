@@ -84,9 +84,17 @@ afterEach(() => {
     // Limpiar cookies y storage después de cada test en CI
     cy.clearCookies();
     cy.clearLocalStorage();
-    cy.clearSessionStorage();
+    // cy.clearSessionStorage() no existe en Cypress 13.x
+    // Usar cy.window() para limpiar sessionStorage manualmente
+    cy.window().then((win) => {
+      try {
+        win.sessionStorage.clear();
+      } catch (e) {
+        console.log('SessionStorage clear failed:', e.message);
+      }
+    });
     
-    cy.log('✅ CI: Cleanup completed');
+    console.log('✅ CI: Cleanup completed');
   }
 });
 
@@ -94,21 +102,8 @@ afterEach(() => {
 // CONFIGURACIONES ESPECÍFICAS PARA CI
 // ============================================================================
 
-// Aumentar timeouts para elementos en CI
+// Configuración básica para CI
 if (Cypress.env('CI')) {
-  // Override de comandos para mejor estabilidad en CI
-  const originalGet = Cypress.Commands._commands.get[0].fn;
-  
-  Cypress.Commands.overwrite('get', (originalFn, selector, options = {}) => {
-    // Timeouts más generosos en CI
-    const ciOptions = {
-      timeout: 15000,
-      ...options
-    };
-    
-    return originalFn(selector, ciOptions);
-  });
-  
   console.log('✅ CI-specific configurations loaded');
 }
 
