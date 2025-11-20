@@ -1,0 +1,207 @@
+name: 🧪 Cypress E2E Tests CI/CD
+
+# Estrategia de Trigger Inteligente
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    types: [labeled, synchronize]
+  workflow_dispatch:
+    inputs:
+      test_spec:
+        description: 'Test spec to run (optional)'
+        required: false
+        type: string
+
+# Control de ejecución basado en labels para ahorro de recursos
+jobs:
+  test:
+    name: 🚀 Cypress E2E Testing
+    runs-on: ubuntu-latest
+    # Solo ejecuta en push a main o PRs con label e2e-tests
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'e2e-tests'))
+    
+    # Infraestructura como código - Base de Datos CI
+    services:
+      postgres:
+        image: postgres:18
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: myapp_test
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      # 1. Multi-Repository Checkout Strategy
+      - name: 📥 Checkout Cypress tests repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Checkout Happy Testing application
+        uses: actions/checkout@v4
+        with:
+          repository: maalvoro/happy_testing
+          path: happy_testing
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 2. Node.js Environment Setup
+      - name: 🟢 Setup Node.js environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            happy_testing/package-lock.json
+
+      # 3. Database Infrastructure Setup
+      - name: 🐘 Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: ⏳ Wait for Postgres and setup database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          echo "🔍 Waiting for PostgreSQL to be ready..."
+          timeout 30 bash -c 'until pg_isready -h localhost -p 5432 -U postgres; do sleep 2; done'
+          echo "✅ PostgreSQL is ready!"
+          
+          echo "📊 Setting up test database..."
+          createdb -h localhost -p 5432 -U postgres myapp_test || true
+          echo "✅ Database setup complete!"
+
+      # 4. Application Dependencies & Setup
+      - name: 📦 Install application dependencies
+        run: |
+          cd happy_testing
+          # Usar npm ci para builds deterministas en CI
+          npm ci || npm install
+          echo "✅ Application dependencies installed!"
+
+      - name: 🔧 Run database migrations
+        working-directory: happy_testing
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/myapp_test"
+          NODE_ENV: test
+        run: |
+          echo "🚀 Running database migrations..."
+          npm run db:migrate
+          echo "✅ Database migrations completed!"
+
+      # 5. Cypress Dependencies & Setup
+      - name: 📦 Install Cypress dependencies
+        run: |
+          npm ci || npm install
+          echo "✅ Cypress dependencies installed!"
+
+      # 6. Cypress Binary Installation y Verificación
+      - name: 🔧 Install and verify Cypress
+        run: |
+          echo "🔽 Installing Cypress binary..."
+          npx cypress install
+          echo "✅ Verifying Cypress installation..."
+          npx cypress verify
+          echo "ℹ️ Cypress version info:"
+          npx cypress version
+
+      # 7. Application Startup para Tests
+      - name: 🚀 Start Happy Testing application
+        working-directory: happy_testing
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/myapp_test"
+          NODE_ENV: test
+          PORT: 3000
+        run: |
+          echo "🌟 Starting application for testing..."
+          npm run dev &
+          echo $! > app.pid
+          echo "⏳ Waiting for application to be ready..."
+          timeout 60 bash -c 'until curl -f http://localhost:3000 >/dev/null 2>&1; do sleep 3; done'
+          echo "✅ Application is ready on http://localhost:3000"
+
+      # 8. Cypress E2E Test Execution
+      - name: 🧪 Run Cypress E2E tests
+        env:
+          CYPRESS_baseUrl: http://localhost:3000
+          CYPRESS_defaultCommandTimeout: 10000
+          CYPRESS_requestTimeout: 15000
+          CYPRESS_responseTimeout: 15000
+        run: |
+          echo "🎯 Starting Cypress E2E test execution..."
+          
+          if [ -n "${{ github.event.inputs.test_spec }}" ]; then
+            echo "🔍 Running specific test: ${{ github.event.inputs.test_spec }}"
+            npx cypress run --spec "${{ github.event.inputs.test_spec }}" --browser electron --headless
+          else
+            echo "🏃 Running all Cypress tests..."
+            npx cypress run --browser electron --headless --record false
+          fi
+
+      # 9. Cleanup & Artifact Collection
+      - name: 🛑 Stop application
+        if: always()
+        working-directory: happy_testing
+        run: |
+          if [ -f app.pid ]; then
+            echo "🛑 Stopping application..."
+            kill $(cat app.pid) || true
+            rm -f app.pid
+            echo "✅ Application stopped"
+          fi
+
+      # 10. Test Artifacts Upload
+      - name: 📊 Upload Cypress test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-results
+          path: |
+            cypress/screenshots
+            cypress/videos
+            cypress/reports
+          retention-days: 7
+
+      # 11. Test Report Generation
+      - name: 📈 Generate test summary
+        if: always()
+        run: |
+          echo "## 🧪 Cypress Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -d "cypress/videos" ] && [ "$(ls -A cypress/videos)" ]; then
+            echo "### 🎥 Test Videos Generated" >> $GITHUB_STEP_SUMMARY
+            echo "$(ls -la cypress/videos | wc -l) video files created" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ -d "cypress/screenshots" ] && [ "$(ls -A cypress/screenshots)" ]; then
+            echo "### 📸 Test Screenshots Generated" >> $GITHUB_STEP_SUMMARY
+            echo "$(ls -la cypress/screenshots | wc -l) screenshot files created" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "### ✅ Test Execution Complete" >> $GITHUB_STEP_SUMMARY
+          echo "Check uploaded artifacts for detailed results" >> $GITHUB_STEP_SUMMARY
+
+  # Job para notificación de resultados
+  notify:
+    name: 📢 Test Results Notification
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: 📊 Report test status
+        run: |
+          if [ "${{ needs.test.result }}" == "success" ]; then
+            echo "✅ All Cypress tests passed successfully!"
+          elif [ "${{ needs.test.result }}" == "failure" ]; then
+            echo "❌ Some Cypress tests failed. Check artifacts for details."
+            exit 1
+          else
+            echo "⚠️ Tests completed with status: ${{ needs.test.result }}"
+          fi
