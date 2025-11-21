@@ -1,4 +1,4 @@
-# 🚀 Guía de Configuración CI/CD - Cypress + Happy Testing
+# 🚀 Guía de Configuración CI/CD - Cypress + Happy Testing.
 
 ## 📋 Arquitectura CI/CD para Cypress
 
