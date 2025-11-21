@@ -199,13 +199,14 @@ jobs:
             
             # Extract final summary from Cypress output
             if grep -q "All specs passed!" cypress-output.log; then
-              TOTAL_TESTS=$(grep -oP "✔\s+All specs passed!\s+\K\d+:\d+\s+\K\d+" cypress-output.log | tail -1)
-              PASSING_TESTS=$(grep -oP "✔\s+All specs passed!\s+\K\d+:\d+\s+\d+\s+\K\d+" cypress-output.log | tail -1)
-              DURATION=$(grep -oP "✔\s+All specs passed!\s+\K\d+:\d+" cypress-output.log | tail -1)
+              # Extract total and passing tests from "All specs passed! 02:19 64 64 - - -" format
+              TOTAL_TESTS=$(grep -oP "All specs passed!\s+\d+:\d+\s+\K\d+" cypress-output.log | tail -1)
+              PASSING_TESTS=$(grep -oP "All specs passed!\s+\d+:\d+\s+\d+\s+\K\d+" cypress-output.log | tail -1)
+              DURATION=$(grep -oP "All specs passed!\s+\K\d+:\d+" cypress-output.log | tail -1)
               
               echo "🎉 **All Tests Passed Successfully!**" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "- ✅ **Tests Passing**: ${PASSING_TESTS:-28}" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ **Tests Passing**: ${PASSING_TESTS}" >> $GITHUB_STEP_SUMMARY
               echo "- ❌ **Tests Failing**: 0" >> $GITHUB_STEP_SUMMARY
               echo "- ⏱️ **Total Duration**: ${DURATION:-'N/A'}" >> $GITHUB_STEP_SUMMARY
               echo "- 📈 **Success Rate**: 100%" >> $GITHUB_STEP_SUMMARY
