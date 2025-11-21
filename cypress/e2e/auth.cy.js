@@ -49,13 +49,15 @@ describe('Authentication Tests', () => {
     it('should login successfully with valid credentials', () => {
       cy.visit('/login');
       
-      // Usar las credenciales del usuario de prueba
-      cy.get('[data-testid="login-email-input"]').type('test@nutriapp.com');
-      cy.get('[data-testid="login-password-input"]').type('nutriapp123');
-      cy.get('[data-testid="login-submit"]').click();
-      
-      // Verificar redirección a dishes
-      cy.url().should('include', '/dishes');
+      // Usar las credenciales del usuario de sesión
+      cy.getSessionTestUser().then((user) => {
+        cy.get('[data-testid="login-email-input"]').type(user.email);
+        cy.get('[data-testid="login-password-input"]').type(user.password);
+        cy.get('[data-testid="login-submit"]').click();
+        
+        // Verificar redirección a dishes
+        cy.url().should('include', '/dishes');
+      });
     });
   });
 

@@ -5,137 +5,166 @@
 // ***********************************************
 
 // ============================================================================
-// AUTENTICACIÓN - Comandos optimizados para CI
+// UTILIDADES - Generación de usuario único por sesión (como Playwright)
 // ============================================================================
 
-// Login rápido vía API para mejor performance en CI
-Cypress.Commands.add('loginAsTestUser', () => {
-  cy.log('🔐 Logging in as test user via API for CI optimization');
+// Generar credenciales únicas UNA VEZ por sesión de tests
+function generateSessionTestUser() {
+  const timestamp = Date.now();
+  const randomId = Math.random().toString(36).substring(2, 8);
+  const runId = Cypress.env('GITHUB_RUN_ID') || 'local';
   
-  // Primer intento de login
-  cy.request({
-    method: 'POST',
-    url: '/api/login',
-    body: {
-      email: 'test@nutriapp.com',
-      password: 'nutriapp123'
-    },
-    failOnStatusCode: false // Para manejar errores gracefully en CI
-  }).then((response) => {
-    if (response.status === 200) {
-      cy.log('✅ API login successful');
-      // Verificar que el login estableció la sesión correctamente
-      cy.visit('/dishes');
-      cy.url().should('include', '/dishes', { timeout: 10000 });
-    } else {
-      cy.log(`⚠️ API login failed with status: ${response.status}`);
-      cy.log(`Response body: ${JSON.stringify(response.body)}`);
+  return {
+    firstName: 'Test',
+    lastName: `User${randomId}`,
+    email: `test-session-${timestamp}-${randomId}-${runId}@nutriapp.com`,
+    nationality: 'México',
+    phone: '+521234567890',
+    password: `nutriapp123${randomId}`
+  };
+}
+
+// Almacenar credenciales del usuario de sesión (se genera solo una vez)
+let sessionTestUser = null;
+
+// Obtener o crear el usuario único de la sesión
+Cypress.Commands.add('getSessionTestUser', () => {
+  if (!sessionTestUser) {
+    sessionTestUser = generateSessionTestUser();
+    cy.log(`🆔 Generated session user (will be reused): ${sessionTestUser.email}`);
+    
+    // Marcar que este usuario debe ser creado
+    sessionTestUser._needsCreation = true;
+  }
+  return cy.wrap(sessionTestUser);
+});
+
+// Crear el usuario de sesión una sola vez
+Cypress.Commands.add('createSessionUserOnce', () => {
+  cy.getSessionTestUser().then((user) => {
+    if (user._needsCreation) {
+      cy.log(`🔧 Creating session user once: ${user.email}`);
       
-      // Intentar crear el usuario nuevamente y luego hacer login
-      cy.log('🔄 Attempting to re-setup user and login again...');
-      cy.setupTestUser();
-      cy.wait(2000); // Esperar un poco más para que se procese
+      // Verificar que la aplicación esté funcionando
+      cy.request({
+        url: '/',
+        timeout: 10000,
+        failOnStatusCode: false
+      }).then((healthResponse) => {
+        cy.log(`🏥 App health check: ${healthResponse.status}`);
+      });
       
-      // Segundo intento de login después de setup
+      // Registrar el usuario de sesión
       cy.request({
         method: 'POST',
-        url: '/api/login',
+        url: '/api/register',
         body: {
-          email: 'test@nutriapp.com',
-          password: 'nutriapp123'
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          nationality: user.nationality,
+          phone: user.phone,
+          password: user.password
         },
         failOnStatusCode: false
-      }).then((retryResponse) => {
-        if (retryResponse.status === 200) {
-          cy.log('✅ API login successful on retry');
-          cy.visit('/dishes');
-          cy.url().should('include', '/dishes', { timeout: 10000 });
+      }).then((registerResponse) => {
+        cy.log(`📝 Session user registration: ${registerResponse.status}`);
+        if (registerResponse.body) {
+          cy.log(`Registration response: ${JSON.stringify(registerResponse.body)}`);
+        }
+        
+        if (registerResponse.status === 200 || registerResponse.status === 201) {
+          cy.log('✅ Session user created successfully');
+          
+          // Verificar que funciona
+          cy.wait(2000);
+          cy.request({
+            method: 'POST',
+            url: '/api/login',
+            body: {
+              email: user.email,
+              password: user.password
+            },
+            failOnStatusCode: false
+          }).then((verifyResponse) => {
+            if (verifyResponse.status === 200) {
+              cy.log('✅ Session user verified and ready for all tests');
+              user._needsCreation = false; // Marcar como creado
+            } else {
+              throw new Error(`Session user creation failed: ${verifyResponse.status}`);
+            }
+          });
         } else {
-          cy.log('⚠️ API login failed on retry, falling back to UI login');
-          cy.loginAsTestUserUI();
+          throw new Error(`Session user registration failed: ${registerResponse.status} - ${JSON.stringify(registerResponse.body)}`);
         }
       });
+    } else {
+      cy.log('✅ Session user already created, reusing...');
     }
   });
 });
 
-// Login UI específico para tests que necesitan probar el flujo de login
-Cypress.Commands.add('loginAsTestUserUI', () => {
-  cy.log('🔐 Logging in via UI');
-  
-  cy.visit('/login');
-  
-  // Esperar que la página esté completamente cargada
-  cy.get('[data-testid="login-email-input"]', { timeout: 15000 }).should('be.visible').clear().type('test@nutriapp.com');
-  cy.get('[data-testid="login-password-input"]', { timeout: 10000 }).should('be.visible').clear().type('nutriapp123');
-  
-  // Verificar que el botón esté habilitado antes de hacer click
-  cy.get('[data-testid="login-submit"]').should('be.enabled').click();
-  
-  // Espera robusta para CI con mejor timeout
-  cy.url({ timeout: 20000 }).should('include', '/dishes');
-  cy.get('[data-testid="dishes-container"]', { timeout: 15000 }).should('be.visible');
-  
-  cy.log('✅ UI login successful');
-});
+// ============================================================================
+// AUTENTICACIÓN - Comandos optimizados para CI con usuarios dinámicos
+// ============================================================================
 
-// Setup de usuario de prueba para CI
-Cypress.Commands.add('setupTestUser', () => {
-  cy.log('🔧 Setting up test user for CI environment');
-  
-  // Primero intentar hacer login para ver si ya existe
-  cy.request({
-    method: 'POST',
-    url: '/api/login',
-    body: {
-      email: 'test@nutriapp.com',
-      password: 'nutriapp123'
-    },
-    failOnStatusCode: false
-  }).then((loginResponse) => {
-    if (loginResponse.status === 200) {
-      cy.log('✅ Test user already exists and can login');
-      return; // Usuario ya existe y funciona
-    }
+// Login rápido vía API usando el usuario de sesión (reutilizable)
+Cypress.Commands.add('loginAsTestUser', () => {
+  cy.getSessionTestUser().then((user) => {
+    cy.log(`🔐 Logging in as session user: ${user.email}`);
     
-    cy.log('⚠️ Test user does not exist, creating...');
-    // Si login falla, intenta registrar usuario de prueba
+    // Asegurar que el usuario esté creado antes de intentar login
+    cy.createSessionUserOnce();
+    
+    // Login con el usuario de sesión
     cy.request({
       method: 'POST',
-      url: '/api/register',
+      url: '/api/login',
       body: {
-        name: 'Test User',
-        email: 'test@nutriapp.com',
-        password: 'nutriapp123'
+        email: user.email,
+        password: user.password
       },
       failOnStatusCode: false
-    }).then((registerResponse) => {
-      if (registerResponse.status === 200 || registerResponse.status === 201) {
-        cy.log('✅ Test user registered successfully');
-        
-        // Verificar que el registro funcionó haciendo login inmediatamente
-        cy.wait(1000); // Pequeña pausa para que DB procese
-        cy.request({
-          method: 'POST',
-          url: '/api/login',
-          body: {
-            email: 'test@nutriapp.com',
-            password: 'nutriapp123'
-          },
-          failOnStatusCode: false
-        }).then((verifyResponse) => {
-          if (verifyResponse.status === 200) {
-            cy.log('✅ Test user verified - login successful after registration');
-          } else {
-            cy.log('❌ Test user registration failed - cannot login after register');
-          }
-        });
+    }).then((response) => {
+      if (response.status === 200) {
+        cy.log('✅ API login successful with session user');
+        cy.visit('/dishes');
+        cy.url().should('include', '/dishes', { timeout: 10000 });
       } else {
-        cy.log('❌ Test user registration failed');
-        cy.log(`Registration response: ${JSON.stringify(registerResponse.body)}`);
+        cy.log(`⚠️ API login failed with status: ${response.status}`);
+        cy.log(`Response body: ${JSON.stringify(response.body)}`);
+        cy.log('🔄 Falling back to UI login...');
+        cy.loginAsTestUserUI();
       }
     });
   });
+});
+
+// Login UI usando el usuario de sesión
+Cypress.Commands.add('loginAsTestUserUI', () => {
+  cy.getSessionTestUser().then((user) => {
+    cy.log(`🔐 Logging in via UI with session user: ${user.email}`);
+    
+    cy.visit('/login');
+    
+    // Esperar que la página esté completamente cargada
+    cy.get('[data-testid="login-email-input"]', { timeout: 15000 }).should('be.visible').clear().type(user.email);
+    cy.get('[data-testid="login-password-input"]', { timeout: 10000 }).should('be.visible').clear().type(user.password);
+    
+    // Verificar que el botón esté habilitado antes de hacer click
+    cy.get('[data-testid="login-submit"]').should('be.enabled').click();
+    
+    // Espera robusta para CI con mejor timeout
+    cy.url({ timeout: 20000 }).should('include', '/dishes');
+    cy.get('[data-testid="dishes-container"]', { timeout: 15000 }).should('be.visible');
+    
+    cy.log('✅ UI login successful with session user');
+  });
+});
+
+// Setup del usuario de sesión (se ejecuta una sola vez)
+Cypress.Commands.add('setupTestUser', () => {
+  cy.createSessionUserOnce();
 });
 
 // ============================================================================

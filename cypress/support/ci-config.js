@@ -52,11 +52,14 @@ const environments = {
 // ============================================================================
 
 const testData = {
+  // User configurations are now handled dynamically
+  // See commands.js getTestUserCredentials() for dynamic user generation
   users: {
+    // Legacy configuration - now handled by dynamic system
     testUser: {
-      name: 'CI Test User',
-      email: 'test@nutriapp.com',
-      password: 'nutriapp123'
+      name: 'Dynamic Test User',
+      email: 'dynamic-user@nutriapp.com', // Placeholder - actual email is generated dynamically
+      password: 'dynamic-password'         // Placeholder - actual password is generated dynamically
     },
     adminUser: {
       name: 'CI Admin User',
