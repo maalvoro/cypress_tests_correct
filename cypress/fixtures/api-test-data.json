@@ -1,0 +1,66 @@
+{
+  "validUserData": {
+    "firstName": "Juan",
+    "lastName": "Pérez",
+    "nationality": "México",
+    "phone": "+521234567890",
+    "password": "Test1234!"
+  },
+  "invalidUserData": {
+    "missingFields": {
+      "firstName": "",
+      "lastName": "",
+      "email": "",
+      "nationality": "",
+      "phone": "",
+      "password": ""
+    },
+    "invalidEmail": {
+      "firstName": "Test",
+      "lastName": "User",
+      "email": "invalid-email-format",
+      "nationality": "México",
+      "phone": "+521234567890",
+      "password": "Test1234!"
+    },
+    "shortPassword": {
+      "firstName": "Test",
+      "lastName": "User",
+      "email": "test@example.com",
+      "nationality": "México",
+      "phone": "+521234567890",
+      "password": "123"
+    }
+  },
+  "validDishData": {
+    "name": "Platillo de Prueba",
+    "description": "Descripción del platillo de prueba para testing",
+    "quickPrep": true,
+    "prepTime": 15,
+    "cookTime": 20,
+    "imageUrl": "https://example.com/test-image.jpg",
+    "steps": [
+      "Paso 1: Preparar ingredientes",
+      "Paso 2: Cocinar según instrucciones", 
+      "Paso 3: Servir y disfrutar"
+    ],
+    "calories": 250
+  },
+  "invalidDishData": {
+    "missingFields": {
+      "name": "",
+      "description": "",
+      "prepTime": null,
+      "cookTime": null
+    },
+    "invalidTypes": {
+      "name": 123,
+      "description": true,
+      "quickPrep": "yes",
+      "prepTime": "fifteen",
+      "cookTime": "twenty",
+      "steps": "not an array",
+      "calories": "lots"
+    }
+  }
+}

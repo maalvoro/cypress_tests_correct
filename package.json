@@ -7,11 +7,24 @@
     "cy:open": "cypress open",
     "cy:run": "cypress run",
     "cy:run:headed": "cypress run --headed",
+    
     "cy:run:auth": "cypress run --spec 'cypress/e2e/auth.cy.js'",
     "cy:run:dishes": "cypress run --spec 'cypress/e2e/dishes.cy.js'",
     "cy:run:navigation": "cypress run --spec 'cypress/e2e/navigation.cy.js'",
     "cy:run:setup": "cypress run --spec 'cypress/e2e/00-setup.cy.js'",
+    
+    "cy:run:api": "cypress run --spec 'cypress/e2e/**/*.api.cy.js'",
+    "cy:run:api:auth": "cypress run --spec 'cypress/e2e/auth.api.cy.js'",
+    "cy:run:api:dishes": "cypress run --spec 'cypress/e2e/dishes.api.cy.js'",
+    "cy:run:integration": "cypress run --spec 'cypress/e2e/integration.api.cy.js'",
+    "cy:run:all": "cypress run --spec 'cypress/e2e/**/*.cy.js'",
+    
     "test": "cypress run",
+    "test:ui": "cypress run --spec 'cypress/e2e/auth.cy.js,cypress/e2e/dishes.cy.js,cypress/e2e/navigation.cy.js'",
+    "test:api": "cypress run --spec 'cypress/e2e/**/*.api.cy.js'",
+    "test:integration": "cypress run --spec 'cypress/e2e/integration.api.cy.js'",
+    "test:all": "npm run test:ui && npm run test:api && npm run test:integration",
+    
     "test:ci": "cypress run --config-file cypress.config.ci.js --browser electron --headless",
     "test:ci:record": "cypress run --config-file cypress.config.ci.js --browser electron --headless --record",
     "test:github": "cypress run --config-file cypress.config.github.js --browser electron --headless",
@@ -20,6 +33,7 @@
     "test:chrome": "cypress run --browser chrome",
     "test:firefox": "cypress run --browser firefox",
     "test:edge": "cypress run --browser edge",
+    
     "cy:verify": "cypress verify",
     "cy:info": "cypress info",
     "cy:version": "cypress version",

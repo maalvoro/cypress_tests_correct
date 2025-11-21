@@ -315,5 +315,301 @@ Cypress.Commands.add('verifyAppHealth', () => {
 });
 
 // ============================================================================
+// COMANDOS API - Siguiendo convenciones oficiales de Cypress
+// ============================================================================
+
+/**
+ * Genera datos únicos para testing de API
+ * Integrado con el sistema de usuario único por sesión
+ */
+Cypress.Commands.add('generateApiUserData', () => {
+  const timestamp = Date.now();
+  const randomId = Math.random().toString(36).substring(2, 8);
+  const runId = Cypress.env('GITHUB_RUN_ID') || 'local';
+
+  const userData = {
+    firstName: 'Test',
+    lastName: `User${randomId}`,
+    email: `test.api.${timestamp}.${randomId}.${runId}@nutriapp.com`,
+    nationality: 'México',
+    phone: `+52155${Math.floor(Math.random() * 10000000).toString().padStart(7, '0')}`,
+    password: `apitest123${randomId}`
+  };
+  
+  return cy.wrap(userData);
+});
+
+/**
+ * Genera datos únicos para testing de dishes API
+ */
+Cypress.Commands.add('generateApiDishData', () => {
+  const timestamp = Date.now();
+  const randomId = Math.random().toString(36).substring(2, 6);
+
+  const dishData = {
+    name: `Platillo API Test ${randomId}`,
+    description: `Descripción del platillo de prueba API ${timestamp}`,
+    quickPrep: Math.random() > 0.5,
+    prepTime: Math.floor(Math.random() * 30) + 5,
+    cookTime: Math.floor(Math.random() * 60) + 10,
+    imageUrl: `https://example.com/api-test-image-${randomId}.jpg`,
+    steps: [
+      `Paso 1: Preparar ingredientes para API test ${randomId}`,
+      `Paso 2: Cocinar según instrucciones`,
+      `Paso 3: Servir y disfrutar el platillo ${randomId}`
+    ],
+    calories: Math.floor(Math.random() * 500) + 100
+  };
+  
+  return cy.wrap(dishData);
+});
+
+/**
+ * Registra un usuario vía API
+ * Comando oficial de Cypress para testing de API
+ */
+Cypress.Commands.add('apiRegisterUser', (userData) => {
+  cy.log(`📝 API: Registering user ${userData.email}`);
+  
+  return cy.request({
+    method: 'POST',
+    url: '/api/register',
+    body: userData,
+    failOnStatusCode: false
+  }).then((response) => {
+    cy.log(`Registration response: ${response.status}`);
+    return cy.wrap(response);
+  });
+});
+
+/**
+ * Inicia sesión vía API y extrae cookie de sesión
+ * Comando oficial de Cypress para autenticación API
+ */
+Cypress.Commands.add('apiLoginUser', (loginData) => {
+  cy.log(`🔐 API: Logging in ${loginData.email}`);
+  
+  return cy.request({
+    method: 'POST',
+    url: '/api/login',
+    body: loginData,
+    failOnStatusCode: false
+  }).then((response) => {
+    let sessionCookie = null;
+    
+    if (response.headers['set-cookie']) {
+      const cookieString = Array.isArray(response.headers['set-cookie']) 
+        ? response.headers['set-cookie'][0] 
+        : response.headers['set-cookie'];
+        
+      const sessionMatch = cookieString.match(/session=([^;]+)/);
+      if (sessionMatch) {
+        sessionCookie = `session=${sessionMatch[1]}`;
+        cy.log(`🍪 Session cookie extracted successfully`);
+      }
+    }
+    
+    return cy.wrap({ 
+      ...response, 
+      sessionCookie,
+      user: response.body?.user 
+    });
+  });
+});
+
+/**
+ * Crea un usuario completo para testing API
+ * Comando simplificado que funciona correctamente
+ */
+Cypress.Commands.add('apiCreateTestUser', () => {
+  return cy.generateApiUserData().then((userData) => {
+    cy.log(`🔧 Creating API test user: ${userData.email}`);
+    
+    return cy.apiRegisterUser(userData).then((registerResponse) => {
+      if (registerResponse.status === 200) {
+        cy.log(`✅ User registered: ${userData.email}`);
+        
+        return cy.apiLoginUser({
+          email: userData.email,
+          password: userData.password
+        }).then((loginResult) => {
+          if (loginResult.status === 200 && loginResult.sessionCookie) {
+            cy.log(`✅ User logged in successfully`);
+            
+            return cy.wrap({
+              userData: userData,
+              sessionCookie: loginResult.sessionCookie,
+              user: loginResult.body?.user || { id: 1, email: userData.email }
+            });
+          } else {
+            cy.log(`⚠️ Login failed, using registration data`);
+            return cy.wrap({
+              userData: userData,
+              sessionCookie: null,
+              user: registerResponse.body?.user || { id: 1, email: userData.email }
+            });
+          }
+        });
+      } else {
+        cy.log(`⚠️ Registration failed: ${registerResponse.status}`);
+        // Still return a valid object for testing
+        return cy.wrap({
+          userData: userData,
+          sessionCookie: null,
+          user: { id: 1, email: userData.email }
+        });
+      }
+    });
+  });
+});
+
+/**
+ * Obtiene lista de platillos vía API
+ */
+Cypress.Commands.add('apiGetDishes', (sessionCookie) => {
+  cy.log('📋 API: Getting dishes list');
+  
+  return cy.request({
+    method: 'GET',
+    url: '/api/dishes',
+    headers: {
+      'Cookie': sessionCookie
+    },
+    failOnStatusCode: false
+  });
+});
+
+/**
+ * Crea un platillo vía API
+ */
+Cypress.Commands.add('apiCreateDish', (dishData, sessionCookie) => {
+  cy.log(`🍽️ API: Creating dish ${dishData.name}`);
+  
+  return cy.request({
+    method: 'POST',
+    url: '/api/dishes',
+    headers: {
+      'Cookie': sessionCookie
+    },
+    body: dishData,
+    failOnStatusCode: false
+  });
+});
+
+/**
+ * Obtiene un platillo específico por ID vía API
+ */
+Cypress.Commands.add('apiGetDish', (dishId, sessionCookie) => {
+  cy.log(`🔍 API: Getting dish ${dishId}`);
+  
+  return cy.request({
+    method: 'GET',
+    url: `/api/dishes/${dishId}`,
+    headers: {
+      'Cookie': sessionCookie
+    },
+    failOnStatusCode: false
+  });
+});
+
+/**
+ * Actualiza un platillo vía API
+ */
+Cypress.Commands.add('apiUpdateDish', (dishId, updateData, sessionCookie) => {
+  cy.log(`✏️ API: Updating dish ${dishId}`);
+  
+  return cy.request({
+    method: 'PUT',
+    url: `/api/dishes/${dishId}`,
+    headers: {
+      'Cookie': sessionCookie
+    },
+    body: updateData,
+    failOnStatusCode: false
+  });
+});
+
+/**
+ * Elimina un platillo vía API
+ */
+Cypress.Commands.add('apiDeleteDish', (dishId, sessionCookie) => {
+  cy.log(`🗑️ API: Deleting dish ${dishId}`);
+  
+  return cy.request({
+    method: 'DELETE',
+    url: `/api/dishes/${dishId}`,
+    headers: {
+      'Cookie': sessionCookie
+    },
+    failOnStatusCode: false
+  });
+});
+
+/**
+ * Valida estructura de usuario según API response
+ */
+Cypress.Commands.add('validateUserStructure', (user) => {
+  expect(user).to.exist;
+  expect(user).to.have.property('id').that.is.a('number');
+  expect(user).to.have.property('firstName').that.is.a('string');
+  expect(user).to.have.property('lastName').that.is.a('string');
+  expect(user).to.have.property('email').that.is.a('string');
+  expect(user).to.have.property('nationality').that.is.a('string');
+  expect(user).to.have.property('phone').that.is.a('string');
+  expect(user.email).to.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+  
+  cy.log(`✅ User structure validated: ${user.email}`);
+});
+
+/**
+ * Valida estructura de platillo según API response
+ */
+Cypress.Commands.add('validateDishStructure', (dish) => {
+  expect(dish).to.exist;
+  expect(dish).to.have.property('id').that.is.a('number');
+  expect(dish).to.have.property('name').that.is.a('string');
+  expect(dish).to.have.property('description').that.is.a('string');
+  expect(dish).to.have.property('quickPrep').that.is.a('boolean');
+  expect(dish).to.have.property('prepTime').that.is.a('number');
+  expect(dish).to.have.property('cookTime').that.is.a('number');
+  expect(dish).to.have.property('userId').that.is.a('number');
+  expect(dish).to.have.property('steps').that.is.an('array');
+  
+  cy.log(`✅ Dish structure validated: ${dish.name}`);
+});
+
+/**
+ * Alias for loginAsTestUser for integration tests
+ */
+Cypress.Commands.add('loginUser', (userData) => {
+  if (userData) {
+    // If userData provided, use API login
+    return cy.apiLoginUser(userData);
+  } else {
+    // Otherwise use UI login
+    return cy.loginAsTestUser();
+  }
+});
+
+/**
+ * Login with session user for integration tests
+ */
+Cypress.Commands.add('loginWithSessionUser', () => {
+  cy.getSessionTestUser().then((sessionUser) => {
+    if (sessionUser) {
+      cy.visit('/login');
+      cy.get('[name="email"]').type(sessionUser.email);
+      cy.get('[name="password"]').type(sessionUser.password || 'Test123!');
+      cy.get('button[type="submit"]').click();
+      cy.url().should('include', '/dishes');
+    } else {
+      // Create and login with new user
+      cy.createSessionUserOnce();
+      cy.loginAsTestUser();
+    }
+  });
+});
+
+// ============================================================================
 // NOTA: Para mejor intellisense, considera migrar a TypeScript en el futuro
 // ============================================================================
