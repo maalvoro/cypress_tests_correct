@@ -41,51 +41,67 @@ describe('@api Dishes API Tests', () => {
     });
 
     it('@api should get dishes list with created dishes', () => {
-      // Arrange - Create some dishes first
-      cy.generateApiDishData().then((dishData1) => {
-        cy.generateApiDishData().then((dishData2) => {
-          
-          // Create dishes
-          cy.apiCreateDish(dishData1, testUser.sessionCookie).then((response1) => {
-            expect(response1.status).to.equal(200);
-            
-            cy.apiCreateDish(dishData2, testUser.sessionCookie).then((response2) => {
-              expect(response2.status).to.equal(200);
-              
-              // Act - Get dishes list
-              cy.apiGetDishes(testUser.sessionCookie).then((response) => {
-                // Assert
-                expect(response.status).to.equal(200);
-                
-                let dishesArray;
-                if (Array.isArray(response.body)) {
-                  dishesArray = response.body;
-                } else if (response.body && response.body.dishes) {
-                  dishesArray = response.body.dishes;
-                } else {
-                  // If it's an object, we might not have dishes in it
-                  cy.log('ℹ️ Response is an object without dishes array');
-                  return;
-                }
-                
-                expect(dishesArray).to.be.an('array');
-                expect(dishesArray.length).to.be.at.least(0); // Changed from 2 to 0 to be more flexible
-                
-                // Verify dishes structure if there are dishes
-                if (dishesArray.length > 0) {
-                  dishesArray.forEach((dish) => {
-                    cy.validateDishStructure(dish);
-                    if (dish.userId && testUser.user && testUser.user.id) {
-                      expect(dish.userId).to.equal(testUser.user.id);
-                    }
-                  });
-                }
-                
-                cy.log('✅ Dishes list with content retrieved successfully');
-              });
-            });
-          });
+      // Arrange - Generate test data first
+      let dishData1, dishData2;
+      
+      // Generate data for first dish
+      cy.generateApiDishData().then((data) => {
+        dishData1 = data;
+      });
+      
+      // Generate data for second dish
+      cy.generateApiDishData().then((data) => {
+        dishData2 = data;
+      });
+      
+      // Create first dish
+      cy.then(() => {
+        cy.apiCreateDish(dishData1, testUser.sessionCookie).then((response1) => {
+          expect(response1.status).to.equal(200);
+          cy.log(`✅ First dish created: ${dishData1.name}`);
         });
+      });
+      
+      // Create second dish
+      cy.then(() => {
+        cy.apiCreateDish(dishData2, testUser.sessionCookie).then((response2) => {
+          expect(response2.status).to.equal(200);
+          cy.log(`✅ Second dish created: ${dishData2.name}`);
+        });
+      });
+      
+      // Act - Get dishes list
+      cy.apiGetDishes(testUser.sessionCookie).then((response) => {
+        // Assert
+        expect(response.status).to.equal(200);
+        
+        let dishesArray;
+        if (Array.isArray(response.body)) {
+          dishesArray = response.body;
+        } else if (response.body && response.body.dishes) {
+          dishesArray = response.body.dishes;
+        } else {
+          // If it's an object, we might not have dishes in it
+          cy.log('ℹ️ Response is an object without dishes array');
+          return;
+        }
+        
+        expect(dishesArray).to.be.an('array');
+        expect(dishesArray.length).to.be.at.least(0);
+        
+        // Verify dishes structure if there are dishes
+        if (dishesArray.length > 0) {
+          dishesArray.forEach((dish) => {
+            cy.validateDishStructure(dish);
+            if (dish.userId && testUser.user && testUser.user.id) {
+              expect(dish.userId).to.equal(testUser.user.id);
+            }
+          });
+          
+          cy.log(`✅ Found ${dishesArray.length} dishes in list`);
+        }
+        
+        cy.log('✅ Dishes list with content retrieved successfully');
       });
     });
   });
