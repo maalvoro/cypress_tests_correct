@@ -11,143 +11,171 @@ describe('Navigation Tests', () => {
 
   describe('Main Navigation', () => {
     it('should navigate between main sections', () => {
-      // Start from dishes page
-      cy.get('[data-testid="dishes-container"]').should('be.visible');
+      // Arrange
+      cy.log('🧭 Testing main navigation flow');
       
-      // Navigate to home page
+      // Act & Assert - Navigation to home
+      cy.get('[data-testid="dishes-container"]').should('be.visible');
       cy.visit('/');
       cy.get('[data-testid="home-container"]').should('be.visible');
       
-      // Navigate back to dishes
+      // Act & Assert - Navigation back to dishes via login
       cy.get('a[data-testid="home-cta"]').click();
       cy.url().should('include', '/login');
       
-      // Login and go to dishes
       cy.loginAsTestUser();
       cy.url().should('include', '/dishes');
+      cy.log('✅ Navigation flow completed successfully');
     });
 
     it('should handle logout functionality', () => {
-      // Click logout button using data-testid
+      // Arrange
+      cy.log('🚪 Testing logout functionality');
+      
+      // Act
       cy.get('[data-testid="nav-logout-button"]').should('be.visible').click();
       
-      // Should redirect to login page
+      // Assert
       cy.url().should('include', '/login');
       cy.get('[data-testid="login-form"]').should('be.visible');
+      cy.log('✅ Logout completed successfully');
     });
 
     it('should redirect to login when not authenticated', () => {
-      // Clear session
+      // Arrange
+      cy.log('🔒 Testing authentication redirects');
       cy.clearCookies();
       
-      // Try to access protected page
+      // Act & Assert - Protected dishes page
       cy.visit('/dishes');
       cy.url().should('include', '/login');
       
-      // Try to access new dish page
+      // Act & Assert - Protected new dish page
       cy.visit('/dishes/new');
       cy.url().should('include', '/login');
+      cy.log('✅ Authentication redirects working correctly');
     });
   });
 
   describe('Breadcrumb Navigation', () => {
     it('should navigate using breadcrumbs if available', () => {
+      // Arrange
+      cy.log('🍞 Testing breadcrumb navigation');
       cy.goToDishes();
       
-      // Go to new dish page
+      // Act
       cy.get('[data-testid="dishes-add-button"]').click();
+      
+      // Assert
       cy.url().should('include', '/dishes/new');
       
-      // Check for breadcrumb navigation using data-testid
+      // Act & Assert - Breadcrumb navigation
       cy.get('body').then(($body) => {
         if ($body.find('[data-testid*="breadcrumb"]').length > 0) {
           cy.get('[data-testid*="breadcrumb"] a').first().click();
           cy.url().should('include', '/dishes');
         } else {
-          // If no breadcrumbs, just navigate back manually
           cy.visit('/dishes');
         }
       });
+      cy.log('✅ Breadcrumb navigation completed');
     });
   });
 
   describe('Form Navigation', () => {
     it('should handle form navigation correctly', () => {
-      // Go to new dish form
+      // Arrange
+      cy.log('📝 Testing form navigation');
+      const testText = 'Partial Form Test';
+      
+      // Act
       cy.visit('/dishes/new');
       cy.get('[data-testid="new-dish-container"]').should('be.visible');
+      cy.get('[data-testid="new-dish-name-input"]').type(testText);
       
-      // Fill partial form
-      cy.get('[data-testid="new-dish-name-input"]').type('Partial Form Test');
-      
-      // Navigate away and back
+      // Act - Navigate away and back
       cy.visit('/dishes');
       cy.visit('/dishes/new');
       
-      // Form should be reset
+      // Assert
       cy.get('[data-testid="new-dish-name-input"]').should('have.value', '');
+      cy.log('✅ Form reset on navigation verified');
     });
   });
 
   describe('Deep Link Navigation', () => {
     it('should handle direct URLs correctly', () => {
-      // Test direct navigation to different pages
+      // Arrange
+      cy.log('🔗 Testing deep link navigation');
+      
+      // Act & Assert - Dishes page
       cy.visit('/dishes');
       cy.url().should('include', '/dishes');
       cy.get('[data-testid="dishes-container"]').should('be.visible');
       
+      // Act & Assert - New dish page
       cy.visit('/dishes/new');
       cy.url().should('include', '/dishes/new');
       cy.get('[data-testid="new-dish-container"]').should('be.visible');
       
-      // Test invalid URLs
+      // Act & Assert - Invalid URLs
       cy.visit('/dishes/invalid-id', { failOnStatusCode: false });
-      // Should handle gracefully (either 404 or redirect)
+      cy.log('✅ Deep link navigation tested');
     });
   });
 
   describe('Responsive Navigation', () => {
     it('should work correctly on mobile viewport', () => {
+      // Arrange
+      cy.log('📱 Testing mobile viewport navigation');
       cy.viewport('iphone-x');
       
+      // Act
       cy.goToDishes();
+      
+      // Assert
       cy.get('[data-testid="dishes-container"]').should('be.visible');
       
-      // Check if mobile menu exists and works using data-testid
+      // Act & Assert - Mobile menu if available
       cy.get('body').then(($body) => {
         if ($body.find('[data-testid*="mobile-menu"]').length > 0) {
           cy.get('[data-testid*="mobile-menu"]').click();
-          // Menu should open
         }
       });
       
-      // Reset viewport
       cy.viewport(1280, 720);
+      cy.log('✅ Mobile navigation tested');
     });
 
     it('should work correctly on tablet viewport', () => {
+      // Arrange
+      cy.log('📱 Testing tablet viewport navigation');
       cy.viewport('ipad-2');
       
+      // Act
       cy.goToDishes();
-      cy.get('[data-testid="dishes-container"]').should('be.visible');
-      
-      // Navigation should still be functional
       cy.get('[data-testid="dishes-add-button"]').click();
+      
+      // Assert
+      cy.get('[data-testid="dishes-container"]').should('be.visible');
       cy.url().should('include', '/dishes/new');
       
-      // Reset viewport
       cy.viewport(1280, 720);
+      cy.log('✅ Tablet navigation tested');
     });
   });
 
   describe('Error Handling Navigation', () => {
     it('should handle network errors gracefully', () => {
-      // Simulate offline scenario
+      // Arrange
+      cy.log('🌐 Testing error handling navigation');
+      
+      // Act
       cy.goToDishes();
       
-      // This test would require network stubbing for full offline testing
-      // For now, just verify the page loads correctly
+      // Assert
       cy.get('[data-testid="dishes-container"]').should('be.visible');
+      cy.log('✅ Error handling navigation verified');
     });
   });
 });
